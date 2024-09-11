@@ -13,12 +13,10 @@
             <option value="asc" {{ request('sort_order') == 'asc' ? 'selected' : '' }}>Ascending</option>
             <option value="desc" {{ request('sort_order') == 'desc' ? 'selected' : '' }}>Descending</option>
         </select>
-        <select name="filters[category]">
-            <option value="">All Categories</option>
+        <select name="filters[category]" class="form-control">
+            <option value="">Select Category</option>
             @foreach($categories as $category)
-                <option value="{{ $category->id }}" {{ request('filters.category') === $category->id ? 'selected' : '' }}>
-                    {{ $category->name }}
-                </option>
+                <option value="{{ $category->id }}">{{ $category->name }}</option>
             @endforeach
         </select>
         <button type="submit">Apply Filters</button>

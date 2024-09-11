@@ -14,30 +14,25 @@ class ProductRepository
     {
         $query = Product::with('categories');
 
-        // Apply search (if applicable)
         if ($search = $queryOption->getSearch()) {
             if ($search->getTerm()) {
                 $query->where('name', 'like', '%' . $search->getTerm() . '%');
             }
         }
-
-        // Apply filters
         if ($filters = $queryOption->getFilters()) {
             foreach ($filters as $filter) {
-                if ($filter['field'] === 'category') {
+                if ($filter->getField() === 'category' && $filter->getValue()) {
                     $query->whereHas('categories', function ($q) use ($filter) {
-                        $q->where('id', $filter['value']);
+                        $q->where('categories.id', $filter->getValue());
                     });
                 }
             }
         }
 
-        // Apply sorting
         if ($sort = $queryOption->getSort()) {
             $query->orderBy($sort->getField(), $sort->getDirection());
         }
 
-        // Paginate results
         return $query->paginate(
             $queryOption->getLimit(),
             ['*'],

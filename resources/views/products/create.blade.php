@@ -3,8 +3,6 @@
 @section('content')
     <div class="container">
         <h1>Create Product</h1>
-
-        <!-- Display validation errors, if any -->
         @if ($errors->any())
             <div class="alert alert-danger">
                 <ul>
@@ -16,7 +14,7 @@
         @endif
 
         <form action="{{ route('products.store') }}" method="POST" enctype="multipart/form-data">
-            @csrf  <!-- CSRF protection -->
+            @csrf
 
             <div class="form-group">
                 <label for="name">Product Name:</label>

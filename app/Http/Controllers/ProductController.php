@@ -19,11 +19,21 @@ class ProductController extends Controller
 
     public function index(Request $request)
     {
+        if ($request->has('filters.category') && is_string($request->input('filters.category'))) {
+            $categoryId = $request->input('filters.category');
+            $request->merge([
+                'filters' => [
+                    'category' => ['field' => 'category', 'value' => $categoryId]
+                ]
+            ]);
+        }
         $queryOption = QueryOptionFactory::createFromIlluminateRequest($request);
         $products = $this->productRepository->paginated($queryOption);
         $categories = Category::all();
+
         return view('products.index', compact('products', 'categories'));
     }
+
     public function create()
     {
         $categories = Category::all();
@@ -45,7 +55,7 @@ class ProductController extends Controller
             $product->update(['image' => $imagePath]);
         }
         $product->categories()->sync($request->categories);
-        return redirect()->route('products.index')->with('success', 'Product created successfully!');
+        return redirect()->route('products.index')->with('success', 'Product created!');
     }
 
 }
