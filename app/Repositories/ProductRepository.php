@@ -3,8 +3,8 @@
 namespace App\Repositories;
 
 use App\Models\Product;
-use YouCanShop\QueryOption\QueryOption;
 use YouCanShop\QueryOption\Laravel\UsesQueryOption;
+use YouCanShop\QueryOption\QueryOption;
 
 class ProductRepository
 {

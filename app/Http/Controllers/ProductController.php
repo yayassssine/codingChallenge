@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Category;
 use App\Models\Product;
+use App\Repositories\CategoryRepository;
 use App\Repositories\ProductRepository;
 use Illuminate\Http\Request;
 use YouCanShop\QueryOption\QueryOptionFactory;
@@ -12,7 +12,7 @@ class ProductController extends Controller
 {
     protected $productRepository;
 
-    public function __construct(ProductRepository $productRepository)
+    public function __construct(ProductRepository $productRepository, private CategoryRepository $categoryRepository)
     {
         $this->productRepository = $productRepository;
     }
@@ -23,20 +23,20 @@ class ProductController extends Controller
             $categoryId = $request->input('filters.category');
             $request->merge([
                 'filters' => [
-                    'category' => ['field' => 'category', 'value' => $categoryId]
-                ]
+                    'category' => ['field' => 'category', 'value' => $categoryId],
+                ],
             ]);
         }
         $queryOption = QueryOptionFactory::createFromIlluminateRequest($request);
         $products = $this->productRepository->paginated($queryOption);
-        $categories = Category::all();
+        $categories = $this->categoryRepository->getAll();
 
         return view('products.index', compact('products', 'categories'));
     }
 
     public function create()
     {
-        $categories = Category::all();
+        $categories = $this->categoryRepository->getAll();
         return view('products.create', compact('categories'));
     }
 
