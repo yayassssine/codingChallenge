@@ -3,41 +3,67 @@
 namespace App\Repositories;
 
 use App\Models\Product;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use YouCanShop\QueryOption\Laravel\UsesQueryOption;
 use YouCanShop\QueryOption\QueryOption;
 
 class ProductRepository
 {
     use UsesQueryOption;
+    protected $categoryRepository;
 
-    public function paginated(QueryOption $queryOption)
+    public function __construct(CategoryRepository $categoryRepository)
     {
-        $query = Product::with('categories');
+        $this->categoryRepository = $categoryRepository;
+    }
+    public function filterByCategory($categoryId, QueryOption $queryOption): LengthAwarePaginator
+    {
+        $productIds = $this->categoryRepository->getProductIdsByCategory($categoryId);
 
-        if ($search = $queryOption->getSearch()) {
-            if ($search->getTerm()) {
-                $query->where('name', 'like', '%' . $search->getTerm() . '%');
-            }
-        }
-        if ($filters = $queryOption->getFilters()) {
-            foreach ($filters as $filter) {
-                if ($filter->getField() === 'category' && $filter->getValue()) {
-                    $query->whereHas('categories', function ($q) use ($filter) {
-                        $q->where('categories.id', $filter->getValue());
-                    });
-                }
-            }
-        }
+        $query = Product::query()->whereIn('id', $productIds);
 
-        if ($sort = $queryOption->getSort()) {
-            $query->orderBy($sort->getField(), $sort->getDirection());
-        }
-
-        return $query->paginate(
+        return $query->with('categories')->paginate(
             $queryOption->getLimit(),
             ['*'],
             'page',
             $queryOption->getPage()
         );
+    }
+
+    public function paginated(QueryOption $queryOption): LengthAwarePaginator
+    {
+        $query = Product::query();
+
+        if ($searchTerm = request('q')) {
+            $query->where('name', 'like', '%' . $searchTerm . '%');
+        }
+
+        if ($sortField = request('sort_field')) {
+            $sortOrder = request('sort_order', 'asc');
+            $query->orderBy($sortField, $sortOrder);
+        }
+
+        return $query->with('categories')->paginate(
+            $queryOption->getLimit(),
+            ['*'],
+            'page',
+            $queryOption->getPage()
+        );
+    }
+
+
+    public function createProduct(array $data)
+    {
+        return Product::create($data);
+    }
+
+    public function updateProductImage(Product $product, string $imagePath)
+    {
+        $product->update(['image' => $imagePath]);
+    }
+
+    public function syncCategories(Product $product, array $categories)
+    {
+        $product->categories()->sync($categories);
     }
 }

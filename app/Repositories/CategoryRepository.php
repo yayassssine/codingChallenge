@@ -10,4 +10,19 @@ class CategoryRepository
     {
         return Category::all();
     }
+    public function getProductIdsByCategory($categoryId)
+    {
+        $category = Category::find($categoryId);
+
+        if (!$category) {
+            return collect();
+        }
+
+        return $category->products()->pluck('id');
+    }
+
+    public function exists($categoryId)
+    {
+        return Category::where('id', $categoryId)->exists();
+    }
 }

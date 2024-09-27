@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\Product;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Validator;
 
 class ImportProducts extends Command
 {
@@ -30,17 +31,26 @@ class ImportProducts extends Command
      */
     public function handle()
     {
-        $name = $this->argument('name');
-        $description = $this->argument('description');
-        $price = $this->argument('price');
-        $categoryId = $this->argument('category_id');
+        $data = [
+            'name' => $this->argument('name'),
+            'description' => $this->argument('description'),
+            'price' => $this->argument('price'),
+            'category_id' => $this->argument('category_id'),
+        ];
 
-        $product = Product::create([
-            'name' => $name,
-            'description' => $description,
-            'price' => $price,
-            'category_id' => $categoryId,
+        $validator = Validator::make($data, [
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'price' => 'required|numeric',
+            'category_id' => 'required|exists:categories,id',
         ]);
+
+        if ($validator->fails()) {
+            $this->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
+            return 1;
+        }
+
+        $product = Product::create($data);
 
         if ($product) {
             $this->info('Product created successfully!');
@@ -50,5 +60,4 @@ class ImportProducts extends Command
 
         return 0;
     }
-
 }

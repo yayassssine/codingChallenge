@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Product;
 use App\Repositories\CategoryRepository;
 use App\Repositories\ProductRepository;
 use Illuminate\Http\Request;
@@ -11,32 +10,42 @@ use YouCanShop\QueryOption\QueryOptionFactory;
 class ProductController extends Controller
 {
     protected $productRepository;
+    protected $categoryRepository;
 
-    public function __construct(ProductRepository $productRepository, private CategoryRepository $categoryRepository)
+    public function __construct(ProductRepository $productRepository, CategoryRepository $categoryRepository)
     {
         $this->productRepository = $productRepository;
+        $this->categoryRepository = $categoryRepository;
     }
 
     public function index(Request $request)
     {
-        if ($request->has('filters.category') && is_string($request->input('filters.category'))) {
-            $categoryId = $request->input('filters.category');
-            $request->merge([
-                'filters' => [
-                    'category' => ['field' => 'category', 'value' => $categoryId],
-                ],
-            ]);
-        }
         $queryOption = QueryOptionFactory::createFromIlluminateRequest($request);
-        $products = $this->productRepository->paginated($queryOption);
+
+        if ($request->has('filters.category') && $request->input('filters.category') != '') {
+            $categoryId = $request->input('filters.category');
+
+            if (!$this->categoryRepository->exists($categoryId)) {
+                return redirect()->route('products.index')->withErrors(['category' => 'Invalid category selected']);
+            }
+
+            $products = $this->productRepository->filterByCategory($categoryId, $queryOption);
+        } else {
+            $products = $this->productRepository->paginated($queryOption);
+        }
+
         $categories = $this->categoryRepository->getAll();
 
         return view('products.index', compact('products', 'categories'));
     }
 
+
+
+
     public function create()
     {
         $categories = $this->categoryRepository->getAll();
+
         return view('products.create', compact('categories'));
     }
 
@@ -49,13 +58,16 @@ class ProductController extends Controller
             'image' => 'nullable|image|mimes:jpg,png,jpeg,gif|max:2048',
             'categories' => 'required|array',
         ]);
-        $product = Product::create($request->only('name', 'description', 'price'));
+
+        $product = $this->productRepository->createProduct($request->only('name', 'description', 'price'));
+
         if ($request->hasFile('image')) {
             $imagePath = $request->file('image')->store('images', 'public');
-            $product->update(['image' => $imagePath]);
+            $this->productRepository->updateProductImage($product, $imagePath);
         }
-        $product->categories()->sync($request->categories);
+
+        $this->productRepository->syncCategories($product, $request->categories);
+
         return redirect()->route('products.index')->with('success', 'Product created!');
     }
-
 }
