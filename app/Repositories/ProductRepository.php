@@ -4,46 +4,34 @@ namespace App\Repositories;
 
 use App\Models\Product;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use YouCanShop\QueryOption\Laravel\UsesQueryOption;
 use YouCanShop\QueryOption\QueryOption;
 
 class ProductRepository
 {
-    use UsesQueryOption;
-    protected $categoryRepository;
-
-    public function __construct(CategoryRepository $categoryRepository)
+    public function filterByIds(array $productIds, QueryOption $queryOption): LengthAwarePaginator
     {
-        $this->categoryRepository = $categoryRepository;
-    }
-    public function filterByCategory($categoryId, QueryOption $queryOption): LengthAwarePaginator
-    {
-        $productIds = $this->categoryRepository->getProductIdsByCategory($categoryId);
-
-        $query = Product::query()->whereIn('id', $productIds);
-
-        return $query->with('categories')->paginate(
-            $queryOption->getLimit(),
-            ['*'],
-            'page',
-            $queryOption->getPage()
-        );
+        return Product::whereIn('id', $productIds)
+            ->paginate(
+                $queryOption->getLimit(),
+                ['*'],
+                'page',
+                $queryOption->getPage()
+            );
     }
 
-    public function paginated(QueryOption $queryOption): LengthAwarePaginator
+    public function paginated(QueryOption $queryOption, ?string $searchTerm = null, ?string $sortField = null, string $sortOrder = 'asc'): LengthAwarePaginator
     {
         $query = Product::query();
 
-        if ($searchTerm = request('q')) {
+        if ($searchTerm) {
             $query->where('name', 'like', '%' . $searchTerm . '%');
         }
 
-        if ($sortField = request('sort_field')) {
-            $sortOrder = request('sort_order', 'asc');
+        if ($sortField) {
             $query->orderBy($sortField, $sortOrder);
         }
 
-        return $query->with('categories')->paginate(
+        return $query->paginate(
             $queryOption->getLimit(),
             ['*'],
             'page',
@@ -51,19 +39,13 @@ class ProductRepository
         );
     }
 
-
-    public function createProduct(array $data)
+    public function createProduct(array $data): Product
     {
         return Product::create($data);
     }
 
-    public function updateProductImage(Product $product, string $imagePath)
+    public function updateProduct(Product $product, array $data): void
     {
-        $product->update(['image' => $imagePath]);
-    }
-
-    public function syncCategories(Product $product, array $categories)
-    {
-        $product->categories()->sync($categories);
+        $product->update($data);
     }
 }

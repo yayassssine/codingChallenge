@@ -3,25 +3,21 @@
 namespace App\Repositories;
 
 use App\Models\Category;
+use Illuminate\Support\Collection;
 
 class CategoryRepository
 {
-    public function getAll()
+    public function getAll(): Collection
     {
         return Category::all();
     }
-    public function getProductIdsByCategory($categoryId)
+
+    public function findById(int $categoryId): ?Category
     {
-        $category = Category::find($categoryId);
-
-        if (!$category) {
-            return collect();
-        }
-
-        return $category->products()->pluck('id');
+        return Category::find($categoryId);
     }
 
-    public function exists($categoryId)
+    public function exists(int $categoryId): bool
     {
         return Category::where('id', $categoryId)->exists();
     }

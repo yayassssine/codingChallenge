@@ -2,62 +2,59 @@
 
 namespace App\Console\Commands;
 
-use App\Models\Product;
+use App\Services\ProductService;
+use App\Services\ValidationService;
 use Illuminate\Console\Command;
-use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\ValidationException;
 
 class ImportProducts extends Command
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string
-     */
     protected $signature = 'product:create
-                            {name : name of product}
-                            {price : price}
-                            {category_id : ID of category}
-                            {description? : description of product}';
+                            {name : The name of the product}
+                            {price : The price of the product}
+                            {category_id : The ID of the category}
+                            {description? : The description of the product}';
 
-    /**
-     * The console command description.
-     *
-     * @var string
-     */
     protected $description = 'Create a new product from the CLI';
 
-    /**
-     * Execute the console command.
-     */
-    public function handle()
+    private ProductService $productService;
+    private ValidationService $validationService;
+
+    public function __construct(ProductService $productService, ValidationService $validationService)
+    {
+        parent::__construct();
+        $this->productService = $productService;
+        $this->validationService = $validationService;
+    }
+
+    public function handle(): int
     {
         $data = [
             'name' => $this->argument('name'),
             'description' => $this->argument('description'),
             'price' => $this->argument('price'),
-            'category_id' => $this->argument('category_id'),
+            'categories' => [$this->argument('category_id')],
         ];
 
-        $validator = Validator::make($data, [
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'category_id' => 'required|exists:categories,id',
-        ]);
+        $isSuccess = false;
+        try {
+            $this->validationService->validateProduct($data);
+            $product = $this->productService->createProduct($data);
 
-        if ($validator->fails()) {
-            $this->error('Validation failed: ' . implode(', ', $validator->errors()->all()));
-            return 1;
+            if ($product) {
+                $this->productService->syncCategories($product, $data['categories']);
+
+                $this->info('Product created successfully!');
+                $isSuccess = true;
+            }
+        } catch (ValidationException $e) {
+            foreach ($e->errors() as $fieldErrors) {
+                foreach ($fieldErrors as $error) {
+                    $this->error($error);
+                }
+            }
         }
 
-        $product = Product::create($data);
-
-        if ($product) {
-            $this->info('Product created successfully!');
-        } else {
-            $this->error('Failed to create the product.');
-        }
-
-        return 0;
+        return $isSuccess ? 0 : 1;
     }
 }

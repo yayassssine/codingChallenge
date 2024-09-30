@@ -2,72 +2,61 @@
 
 namespace App\Http\Controllers;
 
-use App\Repositories\CategoryRepository;
-use App\Repositories\ProductRepository;
+use App\Services\ProductService;
+use App\Services\ValidationService;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use YouCanShop\QueryOption\QueryOptionFactory;
 
 class ProductController extends Controller
 {
-    protected $productRepository;
-    protected $categoryRepository;
+    private ProductService $productService;
+    private ValidationService $validationService;
 
-    public function __construct(ProductRepository $productRepository, CategoryRepository $categoryRepository)
+    public function __construct(ProductService $productService, ValidationService $validationService)
     {
-        $this->productRepository = $productRepository;
-        $this->categoryRepository = $categoryRepository;
+        $this->productService = $productService;
+        $this->validationService = $validationService;
     }
 
-    public function index(Request $request)
+    public function index(Request $request): View
     {
         $queryOption = QueryOptionFactory::createFromIlluminateRequest($request);
 
-        if ($request->has('filters.category') && $request->input('filters.category') != '') {
-            $categoryId = $request->input('filters.category');
+        $searchTerm = $request->input('q', null);
+        $sortField = $request->input('sort_field', 'name');
+        $sortOrder = $request->input('sort_order', 'asc');
+        $categoryId = $request->input('filters.category', null);
 
-            if (!$this->categoryRepository->exists($categoryId)) {
-                return redirect()->route('products.index')->withErrors(['category' => 'Invalid category selected']);
+        if ($categoryId) {
+            $products = $this->productService->filterByCategory((int)$categoryId, $queryOption);
+        } else {
+            $products = $this->productService->paginated($queryOption);
+        }
+
+        $categories = $this->productService->getAllCategories();
+
+        return view('products.index', compact('products', 'categories', 'searchTerm', 'sortField', 'sortOrder', 'categoryId'));
+    }
+
+    public function store(Request $request): RedirectResponse
+    {
+        try {
+            $this->validationService->validateProduct($request->all());
+            $product = $this->productService->createProduct($request->only('name', 'description', 'price'));
+
+            if ($request->hasFile('image')) {
+                $imagePath = $request->file('image')->store('images', 'public');
+                $this->productService->updateProductImage($product, $imagePath);
             }
 
-            $products = $this->productRepository->filterByCategory($categoryId, $queryOption);
-        } else {
-            $products = $this->productRepository->paginated($queryOption);
+            $this->productService->syncCategories($product, $request->categories);
+
+            return redirect()->route('products.index')->with('success', 'Product created!');
+        } catch (ValidationException $e) {
+            return redirect()->back()->withErrors($e->errors());
         }
-
-        $categories = $this->categoryRepository->getAll();
-
-        return view('products.index', compact('products', 'categories'));
-    }
-
-
-
-
-    public function create()
-    {
-        $categories = $this->categoryRepository->getAll();
-
-        return view('products.create', compact('categories'));
-    }
-
-    public function store(Request $request)
-    {
-        $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric',
-            'image' => 'nullable|image|mimes:jpg,png,jpeg,gif|max:2048',
-            'categories' => 'required|array',
-        ]);
-
-        $product = $this->productRepository->createProduct($request->only('name', 'description', 'price'));
-
-        if ($request->hasFile('image')) {
-            $imagePath = $request->file('image')->store('images', 'public');
-            $this->productRepository->updateProductImage($product, $imagePath);
-        }
-
-        $this->productRepository->syncCategories($product, $request->categories);
-
-        return redirect()->route('products.index')->with('success', 'Product created!');
     }
 }
