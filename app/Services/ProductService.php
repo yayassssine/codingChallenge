@@ -22,30 +22,25 @@ class ProductService
 
     public function filterByCategory(int $categoryId, QueryOption $queryOption): LengthAwarePaginator
     {
+        $paginatedProducts = new LengthAwarePaginator([], 0, $queryOption->getLimit(), $queryOption->getPage(), [
+            'path' => request()->url(),
+            'query' => request()->query(),
+        ]);
+    
         $category = $this->categoryRepository->findById($categoryId);
-
-        if (!$category) {
-            return new LengthAwarePaginator([], 0, $queryOption->getLimit(), $queryOption->getPage(), [
-                'path' => request()->url(),
-                'query' => request()->query(),
-            ]);
+    
+        if ($category) {
+            $productIds = $category->products()->pluck('id');
+    
+            if ($productIds->isNotEmpty()) {
+                $paginatedProducts = $this->productRepository->filterByIds($productIds->toArray(), $queryOption);
+    
+                $paginatedProducts->getCollection()->each(function ($product) {
+                    $product->categories = $product->categories()->get();
+                });
+            }
         }
-
-        $productIds = $category->products()->pluck('id');
-
-        if ($productIds->isEmpty()) {
-            return new LengthAwarePaginator([], 0, $queryOption->getLimit(), $queryOption->getPage(), [
-                'path' => request()->url(),
-                'query' => request()->query(),
-            ]);
-        }
-
-        $paginatedProducts = $this->productRepository->filterByIds($productIds->toArray(), $queryOption);
-
-        $paginatedProducts->getCollection()->each(function ($product) {
-            $product->categories = $product->categories()->get();
-        });
-
+    
         return $paginatedProducts;
     }
 
@@ -63,6 +58,7 @@ class ProductService
 
         return $paginatedProducts;
     }
+    
     public function createProduct(array $data): Product
     {
         return $this->productRepository->createProduct($data);
